@@ -14,8 +14,10 @@ class ConditionFactory
     ConditionFactory() {}
     virtual ~ConditionFactory() {}
 
-    virtual std::string getName() = 0;
-    virtual Conditional* createCondition() = 0;
+    virtual bool condMatch(const std::string &expr) const = 0;
+
+    virtual Conditional *createCondition() = 0;
+    virtual void destroyCondition(Conditional *cond) = 0;
 };
 
 template <class Cond>
@@ -28,14 +30,19 @@ class ConditionFactoryImp : public ConditionFactory
 
     virtual ~ConditionFactoryImp() {}
 
-    virtual std::string getName()
+    virtual bool condMatch(const std::string &expr) const
     {
-        return Cond::getName();
+        return Cond::condMatch();
     }
 
     virtual Conditional *createCondition()
     {
         return new Cond();
+    }
+
+    virtual void destroyCondition(Conditional *cond)
+    {
+        delete cond;
     }
 };
 
@@ -52,7 +59,7 @@ class ConditionFactoryRegistry
     void registerFactory(ConditionFactory *factory);
     void unregisterFactory(ConditionFactory *factory);
 
-    ConditionFactory *getCondFactory(const std::string &cond);
+    ConditionFactory *getCondFactory(const std::string &expr);
 
     VectorIterator<CondFactoryList> getIter();
 
@@ -84,13 +91,14 @@ class AutoRegisterCondition
     ConditionFactoryImp<Cond> mFactory;
 };
 
-#define CONDITION_DECLARATION(Cond)             \
-    static std::string getName();               \
+#define CONDITION_DECLARATION(Cond)                 \
+    static bool condMatch(const std::string &expr);
 
-#define CONDITION_IMPLEMENTION(Cond, name)      \
-    std::string Cond::getName()                 \
-    {                                           \
-        return name;                            \
+#define CONDITION_IMPLEMENTION(Cond, name)          \
+    bool Cond::condMatch(const std::string &expr)   \
+    {                                               \
+        static Cond s_cond;                         \
+        return s_cond.match(expr);                  \
     }
 
 #define CONDITION_FACTORY_REGISTRATION(Cond)                        \
