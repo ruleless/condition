@@ -10,6 +10,8 @@
 #include <string>
 #include <list>
 
+#include "condition_factory.hpp"
+
 #ifndef NAMESPACE_BEG
 # define NAMESPACE_BEG(spaceName) namespace spaceName {
 # define NAMESPACE_END }
@@ -17,6 +19,7 @@
 
 NAMESPACE_BEG(cond)
 
+class ConditionFactory;
 class Conditional;
 typedef std::list<Conditional *> CondList;
 
@@ -24,43 +27,87 @@ typedef std::list<Conditional *> CondList;
 class Conditional
 {
   public:
-    Conditional() {}
+    Conditional(ConditionFactory *fac)
+            :mFactory(fac)
+    {}
+
     virtual ~Conditional() {}
 
-    virtual bool test() = 0;
+    virtual bool test(const void *ctx) = 0;
 
     // check if the expression matchs this conditional object
-    virtual bool match(const std::string &expr) const = 0;
+    virtual bool match(const char *expr) const = 0;
+
+    // number of child condition
+    virtual int childCount() const = 0;
+
+    // add condition
+    virtual bool add(Conditional *c) = 0;
+
+    inline ConditionFactory *getFactory()
+    {
+        return mFactory;
+    }
+
+  protected:
+    ConditionFactory *mFactory;
+};
+
+// union condition
+class UnionCondition : public Conditional
+{
+  public:
+    UnionCondition(ConditionFactory *fac)
+            :Conditional(fac)
+            ,mConds()
+    {}
+
+    virtual ~UnionCondition();
 
     // number of child condition
     virtual int childCount() const;
 
     // add condition
     virtual bool add(Conditional *c);
+
+  protected:
+    CondList mConds;
 };
 
 // logic and
-class ConditionAnd : public Conditional
+class ConditionAnd : public UnionCondition
 {
   public:
-    ConditionAnd()
-            :Conditional()
+    CONDITION_DECLARATION(ConditionAnd);
+
+    ConditionAnd(ConditionFactory *fac)
+            :UnionCondition(fac)
     {}
 
-    virtual ~ConditionAnd();
+    virtual ~ConditionAnd() {}
 
-  private:
+    virtual bool test(const void *ctx);
+
+    // check if the expression matchs this conditional object
+    virtual bool match(const char *expr) const;
 };
 
 // logic or
-class ConditionOr : public Conditional
+class ConditionOr : public UnionCondition
 {
   public:
-    ConditionOr()
-            :Conditional()
+    CONDITION_DECLARATION(ConditionOr);
+
+    ConditionOr(ConditionFactory *fac)
+            :UnionCondition(fac)
     {}
 
-    virtual ~ConditionOr();
+    virtual ~ConditionOr() {}
+
+    virtual bool test(const void *ctx);
+
+    // check if the expression matchs this conditional object
+    virtual bool match(const char *expr) const;
 };
 
 // condition parser
@@ -69,10 +116,11 @@ class ConditionParser
   public:
     ConditionParser()
             :mCondList()
-            ,mPreCond(NULL)
             ,mCurCond(NULL)
             ,mStack(0)
-    {}
+    {
+        memset(mPreCond, NULL, sizeof(mPreCond));
+    }
 
     virtual ~ConditionParser();
 
@@ -86,7 +134,7 @@ class ConditionParser
     void _clearAll();
 
   private:
-    Conditional *newCond(const std::string *expr);
+    Conditional *newCond(const char *expr);
 
   private:
     static const int STACK_SIZE = 32;

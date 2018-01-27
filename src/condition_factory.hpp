@@ -3,10 +3,16 @@
 
 #include <vector>
 
-#include "condition.hpp"
 #include "iterator_wrapper.hpp"
 
+#ifndef NAMESPACE_BEG
+# define NAMESPACE_BEG(spaceName) namespace spaceName {
+# define NAMESPACE_END }
+#endif // NAMESPACE_BEG
+
 NAMESPACE_BEG(cond)
+
+class Conditional;
 
 class ConditionFactory
 {
@@ -14,7 +20,7 @@ class ConditionFactory
     ConditionFactory() {}
     virtual ~ConditionFactory() {}
 
-    virtual bool condMatch(const std::string &expr) const = 0;
+    virtual bool condMatch(const char *expr) const = 0;
 
     virtual Conditional *createCondition() = 0;
     virtual void destroyCondition(Conditional *cond) = 0;
@@ -30,14 +36,14 @@ class ConditionFactoryImp : public ConditionFactory
 
     virtual ~ConditionFactoryImp() {}
 
-    virtual bool condMatch(const std::string &expr) const
+    virtual bool condMatch(const char *expr) const
     {
-        return Cond::condMatch();
+        return Cond::condMatch(expr);
     }
 
     virtual Conditional *createCondition()
     {
-        return new Cond();
+        return new Cond(this);
     }
 
     virtual void destroyCondition(Conditional *cond)
@@ -59,7 +65,7 @@ class ConditionFactoryRegistry
     void registerFactory(ConditionFactory *factory);
     void unregisterFactory(ConditionFactory *factory);
 
-    ConditionFactory *getCondFactory(const std::string &expr);
+    ConditionFactory *getCondFactory(const char *expr);
 
     VectorIterator<CondFactoryList> getIter();
 
@@ -91,14 +97,14 @@ class AutoRegisterCondition
     ConditionFactoryImp<Cond> mFactory;
 };
 
-#define CONDITION_DECLARATION(Cond)                 \
-    static bool condMatch(const std::string &expr);
+#define CONDITION_DECLARATION(Cond)             \
+    static bool condMatch(const char *expr)
 
-#define CONDITION_IMPLEMENTION(Cond, name)          \
-    bool Cond::condMatch(const std::string &expr)   \
-    {                                               \
-        static Cond s_cond;                         \
-        return s_cond.match(expr);                  \
+#define CONDITION_IMPLEMENTION(Cond)            \
+    bool Cond::condMatch(const char *expr)      \
+    {                                           \
+        static Cond s_cond(NULL);               \
+        return s_cond.match(expr);              \
     }
 
 #define CONDITION_FACTORY_REGISTRATION(Cond)                        \

@@ -5,12 +5,82 @@
 
 NAMESPACE_BEG(cond)
 
-ConditionParser::~ConditionParser()
+UnionCondition::~UnionCondition()
 {}
+
+int UnionCondition::childCount() const
+{
+    return (int)mConds.size();
+}
+
+bool UnionCondition::add(Conditional *c)
+{
+    mConds.push_back(c);
+    return true;
+}
+
+bool ConditionAnd::test(const void *ctx)
+{
+    CondList::iterator it = mConds.begin();
+
+    for (; it != mConds.end(); it++)
+    {
+        Conditional *c = *it;
+        if (c && !c->test(ctx))
+            return false;
+    }
+
+    return true;
+}
+
+bool ConditionAnd::match(const char *expr) const
+{
+    if ('&' == *expr && '\0' == *expr)
+        return true;
+    return false;
+}
+
+bool ConditionOr::test(const void *ctx)
+{
+    CondList::iterator it = mConds.begin();
+
+    for (; it != mConds.end(); it++)
+    {
+        Conditional *c = *it;
+        if (c && c->test(ctx))
+            return true;
+    }
+
+    return false;
+}
+
+bool ConditionOr::match(const char *expr) const
+{
+    if ('|' == *expr && '\0' == *expr)
+        return true;
+    return false;
+}
+
+ConditionParser::~ConditionParser()
+{
+    _clearAll();
+}
+
+bool ConditionParser::parse(const char *expr)
+{
+    _clearAll();
+    if (!_parse(expr))
+    {
+        _clearAll();
+        return false;
+    }
+
+    return true;
+}
 
 bool ConditionParser::_parse(const char *expr)
 {
-    char *ptr = expr, *end_ptr = expr + strlen(expr);
+    const char *ptr = expr, *end_ptr = expr + strlen(expr);
 
     while (ptr < end_ptr && isspace(*ptr))
         ptr++;
@@ -74,44 +144,59 @@ bool ConditionParser::_parse(const char *expr)
     }
 
     // parse expression
-    int exprlen = 0;
-    char expr[EXPR_SIZE] = {0};
-    char *expr_end = ptr;
-    while ((expr_end < end_ptr && !EXPR_OP(*expr_end)) &&
-           exprlen < sizeof(expr) - 1)
+    int phraselen = 0;
+    char phrase[EXPR_SIZE] = {0};
+    const char *phrase_end = ptr;
+    while ((phrase_end < end_ptr && !EXPR_OP(*phrase_end)) &&
+           phraselen < (int)sizeof(phrase) - 1)
     {
-        expr[exprlen++] = *expr_end;
-        expr_end++;
+        phrase[phraselen++] = *phrase_end;
+        phrase_end++;
     }
 
-    if (expr_end < end_ptr && !EXPR_OP(*expr_end))
+    if (phrase_end < end_ptr && !EXPR_OP(*phrase_end))
         return false;
 
-    Conditional *c = newCond(expr);
+    Conditional *c = newCond(phrase);
     if (!c)
         return false;
 
     if (NULL == mCurCond)
     {
         mCurCond = c;
-        return _parse(expr_end);
+        return _parse(phrase_end);
     }
     if (mCurCond->childCount() == 1)
     {
         mCurCond->add(c);
-        return _parse(expr_end);
+        return _parse(phrase_end);
     }
 
     return false;
 }
 
 Conditional *ConditionParser::getCondition() const
-{}
+{
+    return mCurCond;
+}
 
 void ConditionParser::_clearAll()
-{}
+{
+    CondList::iterator it = mCondList.begin();
 
-Conditional *ConditionParser::newCond(const std::string *expr)
+    for (; it != mCondList.end(); it++)
+    {
+        ConditionFactory *fac = (*it)->getFactory();
+        fac->destroyCondition(*it);
+    }
+    mCondList.clear();
+
+    memset(mPreCond, NULL, sizeof(mPreCond));
+    mCurCond = NULL;
+    mStack = 0;
+}
+
+Conditional *ConditionParser::newCond(const char *expr)
 {
     ConditionFactoryRegistry *reg = ConditionFactoryRegistry::getRegistry();
     ConditionFactory *fac = reg->getCondFactory(expr);
@@ -121,8 +206,14 @@ Conditional *ConditionParser::newCond(const std::string *expr)
 
     Conditional *c = fac->createCondition();
     assert(c && "new condition failed");
-    mCondList->push_back(c);
+    mCondList.push_back(c);
     return c;
 }
+
+CONDITION_IMPLEMENTION(ConditionAnd);
+CONDITION_FACTORY_REGISTRATION(ConditionAnd);
+
+CONDITION_IMPLEMENTION(ConditionOr);
+CONDITION_FACTORY_REGISTRATION(ConditionOr);
 
 NAMESPACE_END

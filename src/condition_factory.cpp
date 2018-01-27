@@ -46,12 +46,12 @@ void ConditionFactoryRegistry::unregisterFactory(ConditionFactory *factory)
     }
 }
 
-ConditionFactory *ConditionFactoryRegistry::getCondFactory(const std::string &expr)
+ConditionFactory *ConditionFactoryRegistry::getCondFactory(const char *expr)
 {
     CondFactoryList::iterator it = mFactories.begin();
     for (; it != mFactories.end(); ++it)
     {
-        if (condMatch(expr))
+        if ((*it)->condMatch(expr))
         {
             return (*it);
         }
