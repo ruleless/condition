@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include "condition.hpp"
+#include "condition_factory.hpp"
 
 #define EXPR_OP(c) ('(' == c || ')' == c || '&' == c || '|' == c)
 
@@ -33,9 +34,9 @@ bool ConditionAnd::test(const void *ctx)
     return true;
 }
 
-bool ConditionAnd::match(const char *expr) const
+bool ConditionAnd::condMatch(const char *expr)
 {
-    if ('&' == *expr && '\0' == *expr)
+    if ('&' == *expr && '\0' == *(expr + 1))
         return true;
     return false;
 }
@@ -54,9 +55,9 @@ bool ConditionOr::test(const void *ctx)
     return false;
 }
 
-bool ConditionOr::match(const char *expr) const
+bool ConditionOr::condMatch(const char *expr)
 {
-    if ('|' == *expr && '\0' == *expr)
+    if ('|' == *expr && '\0' == *(expr + 1))
         return true;
     return false;
 }
@@ -145,7 +146,7 @@ bool ConditionParser::_parse(const char *expr)
 
     // parse expression
     int phraselen = 0;
-    char phrase[EXPR_SIZE] = {0};
+    char phrase[COND_EXPR_SIZE] = {0};
     const char *phrase_end = ptr;
     while ((phrase_end < end_ptr && !EXPR_OP(*phrase_end)) &&
            phraselen < (int)sizeof(phrase) - 1)
@@ -204,16 +205,13 @@ Conditional *ConditionParser::newCond(const char *expr)
     if (!fac)
         return NULL;
 
-    Conditional *c = fac->createCondition();
+    Conditional *c = fac->createCondition(expr);
     assert(c && "new condition failed");
     mCondList.push_back(c);
     return c;
 }
 
-CONDITION_IMPLEMENTION(ConditionAnd);
 CONDITION_FACTORY_REGISTRATION(ConditionAnd);
-
-CONDITION_IMPLEMENTION(ConditionOr);
 CONDITION_FACTORY_REGISTRATION(ConditionOr);
 
 NAMESPACE_END

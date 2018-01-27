@@ -4,15 +4,9 @@
 #include <vector>
 
 #include "iterator_wrapper.hpp"
-
-#ifndef NAMESPACE_BEG
-# define NAMESPACE_BEG(spaceName) namespace spaceName {
-# define NAMESPACE_END }
-#endif // NAMESPACE_BEG
+#include "condition.hpp"
 
 NAMESPACE_BEG(cond)
-
-class Conditional;
 
 class ConditionFactory
 {
@@ -22,7 +16,7 @@ class ConditionFactory
 
     virtual bool condMatch(const char *expr) const = 0;
 
-    virtual Conditional *createCondition() = 0;
+    virtual Conditional *createCondition(const char *expr) = 0;
     virtual void destroyCondition(Conditional *cond) = 0;
 };
 
@@ -41,9 +35,14 @@ class ConditionFactoryImp : public ConditionFactory
         return Cond::condMatch(expr);
     }
 
-    virtual Conditional *createCondition()
+    virtual Conditional *createCondition(const char *expr)
     {
-        return new Cond(this);
+        Cond *c = new Cond();
+
+        if (!c)
+            return NULL;
+        c->_setEnv(this, expr);
+        return c;
     }
 
     virtual void destroyCondition(Conditional *cond)
@@ -96,16 +95,6 @@ class AutoRegisterCondition
     ConditionFactoryRegistry *mRegistry;
     ConditionFactoryImp<Cond> mFactory;
 };
-
-#define CONDITION_DECLARATION(Cond)             \
-    static bool condMatch(const char *expr)
-
-#define CONDITION_IMPLEMENTION(Cond)            \
-    bool Cond::condMatch(const char *expr)      \
-    {                                           \
-        static Cond s_cond(NULL);               \
-        return s_cond.match(expr);              \
-    }
 
 #define CONDITION_FACTORY_REGISTRATION(Cond)                        \
     static AutoRegisterCondition<Cond> _autoRegisterRegistry_##Cond
